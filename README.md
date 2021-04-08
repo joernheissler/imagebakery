@@ -1,5 +1,18 @@
 # Create custom images for Revolution Pi
 
+## Instructions
+
+```
+# Start an AWS EC2 ARM64 instance, https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
+
+# As root:
+wget -qO- https://github.com/joernheissler/imagebakery/archive/refs/heads/minimal.tar.gz | tar -xvz
+cd imagebakery-minimal
+./build
+
+# Result is raspios-buster-armhf-lite.img.zst
+```
+
 ## Intended usage
 
 ### Download RaspiOS (previously called Raspbian) image

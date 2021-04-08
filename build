@@ -1,0 +1,43 @@
+#!/bin/bash -xe
+
+if [[ $(uname -m) != "aarch64" ]]; then
+    echo "Please run me on an ARM64 machine" 1>&2
+    exit 1
+fi
+
+if [[ $(id -u) != 0 ]]; then
+    echo "Please run me as root." 1>&2
+    exit 1
+fi
+
+run() {
+    apt-get update
+    apt-get -y install curl lsof unzip dosfstools parted bc git figlet zstd zerofree
+
+    if [[ ! -e raspios-buster-armhf-lite.zip ]]; then
+        curl -o tmp-raspios-buster-armhf-lite.zip https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2021-03-25/2021-03-04-raspios-buster-armhf-lite.zip
+        mv tmp-raspios-buster-armhf-lite.zip raspios-buster-armhf-lite.zip
+    fi
+
+    rm -f *.img
+    unzip raspios-buster-armhf-lite.zip
+    mv 20??-??-??-raspios-buster-armhf-lite.img raspios-buster-armhf-lite.img
+
+    ./customize_image.sh raspios-buster-armhf-lite.img
+    zstd --rm --ultra -22 -T0 raspios-buster-armhf-lite.img
+}
+
+fail() {
+    echo -ne '\e[1;31m'
+    figlet FAILURE
+    echo -ne '\e[0m'
+}
+
+success() {
+    echo -ne '\e[1;32m'
+    figlet SUCCESS
+    echo -ne '\e[0m'
+}
+
+run || fail
+success

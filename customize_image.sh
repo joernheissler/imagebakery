@@ -128,7 +128,7 @@ sed -r -i -e 's/#hdmi_force_hotplug=1/hdmi_force_hotplug=1/' \
 	  "$IMAGEDIR/boot/config.txt"
 
 # limit disk space occupied by logs
-ln -s ../cron.daily/logrotate "$IMAGEDIR/etc/cron.hourly"
+ln -sf ../cron.daily/logrotate "$IMAGEDIR/etc/cron.hourly"
 sed -r -i -e 's/delaycompress/#delaycompress/' \
 	  -e 's/sharedscripts/#sharedscripts/' \
 	  "$IMAGEDIR/etc/logrotate.d/rsyslog"
@@ -152,6 +152,7 @@ cp "$BAKERYDIR/templates/revpi.list" "$IMAGEDIR/etc/apt/sources.list.d"
 # from ld.so:
 #   ERROR: ld.so: object '/usr/lib/arm-linux-gnueabihf/libarmmem-${PLATFORM}.so'
 #   from /etc/ld.so.preload cannot be preloaded (cannot open shared object file): ignored.
+touch "$IMAGEDIR/etc/ld.so.preload"
 mv "$IMAGEDIR/etc/ld.so.preload" "$IMAGEDIR/etc/ld.so.preload.bak"
 
 # copy piTest source code
@@ -232,9 +233,7 @@ sed -r -i -e '1d' "$IMAGEDIR/etc/apt/apt.conf" "$IMAGEDIR/etc/apt/sources.list"
 
 chroot "$IMAGEDIR" apt-get -y install `egrep -v '^#' "$BAKERYDIR/debs-to-download"`
 dpkg --root "$IMAGEDIR" --force-depends --purge rpd-wallpaper
-chroot "$IMAGEDIR" apt-get -y install revpi-wallpaper
 chroot "$IMAGEDIR" apt-get update
-chroot "$IMAGEDIR" apt-get -y install teamviewer-revpi
 chroot "$IMAGEDIR" apt-mark hold raspi-copies-and-fills
 chroot "$IMAGEDIR" apt-get -y upgrade
 chroot "$IMAGEDIR" apt-mark unhold raspi-copies-and-fills
@@ -253,26 +252,10 @@ if [ -e "$IMAGEDIR/etc/init.d/apache2" ] ; then
 		"$IMAGEDIR/etc/apache2/apache2.conf"
 fi
 
-# install nodejs and nodered with an install script and revpi-nodes from npm repository
-NODEREDSCRIPT="/tmp/update-nodejs-and-nodered.sh"
-/usr/bin/curl -sL \
-	https://raw.githubusercontent.com/node-red/linux-installers/master/deb/update-nodejs-and-nodered\
-	--output "$IMAGEDIR/$NODEREDSCRIPT"
-chmod 755 "$IMAGEDIR/$NODEREDSCRIPT"
-chroot "$IMAGEDIR" /usr/bin/sudo -u pi $NODEREDSCRIPT --confirm-install --confirm-pi
-rm "$IMAGEDIR/$NODEREDSCRIPT"
-chroot "$IMAGEDIR" /usr/bin/npm install --prefix /home/pi/.node-red node-red-contrib-revpi-nodes
-
 # enable ssh daemon by default, disable swap, disable bluetooth on mini-uart
 chroot "$IMAGEDIR" systemctl enable ssh
 chroot "$IMAGEDIR" systemctl disable dphys-swapfile
 chroot "$IMAGEDIR" systemctl disable hciuart
-
-# disable 3rd party software
-chroot "$IMAGEDIR" systemctl disable logiclab
-chroot "$IMAGEDIR" systemctl disable nodered
-chroot "$IMAGEDIR" systemctl disable noderedrevpinodes-server
-chroot "$IMAGEDIR" systemctl disable revpipyload
 
 # boot to console by default, disable autologin
 chroot "$IMAGEDIR" systemctl set-default multi-user.target
@@ -290,7 +273,10 @@ if [ -e "$IMAGEDIR/etc/systemd/system/getty@tty1.service.d/autologin.conf" ] ; t
 fi
 
 # peg cpu at 1200 MHz to maximize spi0 throughput and avoid jitter
-chroot "$IMAGEDIR" /usr/bin/revpi-config enable perf-governor
+CPUFREQCONFIG="$IMAGEDIR/etc/default/cpufrequtils"
+echo "GOVERNOR=performance" > "$CPUFREQCONFIG"
+chroot "$IMAGEDIR" systemctl disable raspi-config
+chroot "$IMAGEDIR" systemctl enable cpufrequtils
 
 # remove package lists, they will be outdated within days
 rm "$IMAGEDIR/var/lib/apt/lists/"*Packages
@@ -318,6 +304,7 @@ sleep 2
 
 # shrink image to speed up flashing
 resize2fs -M "$LOOPDEVICE"p2
+zerofree "$LOOPDEVICE"p2
 PARTSIZE=$(dumpe2fs -h "$LOOPDEVICE"p2 | egrep "^Block count:" | cut -d" " -f3-)
 PARTSIZE=$((($PARTSIZE+1) * 8))   # ext4 uses 4k blocks, partitions use 512 bytes
 PARTSTART=$(cat /sys/block/$(basename "$LOOPDEVICE")/$(basename "$LOOPDEVICE"p2)/start)

@@ -68,22 +68,12 @@ dpkg-query --admindir $APTROOT/var/lib/dpkg -W		\
 	| egrep -v "^($EXCLUDE)=" | sort | uniq		\
 	| while read package ; do fetch_deb_src "$package" ; done
 
-# fetch missing Raspbian sources
-version=$(dpkg-query --admindir $APTROOT/var/lib/dpkg -W \
-	-f='${source:Version}' wiringpi | tr -dC '[0-9].')
-wget -O wiringpi_$version.tar.gz \
-	https://github.com/WiringPi/WiringPi/archive/final_official_$version.tar.gz
-
 # fetch RevolutionPi sources
 knl_version=$(dpkg-query --admindir $APTROOT/var/lib/dpkg -W \
 	-f='${source:Version}' raspberrypi-kernel || true)
 knl_tag="raspberrypi-kernel_$knl_version"
 wget -O "linux-$knl_version.tar.gz" "https://github.com/RevolutionPi/linux/archive/refs/tags/$knl_tag.tar.gz"
 wget -O "piControl-$knl_version.tar.gz" "https://github.com/RevolutionPi/piControl/archive/refs/tags/$knl_tag.tar.gz"
-wget -O IODeviceExample.tar.gz https://github.com/RevolutionPi/IODeviceExample/archive/master.tar.gz
-wget -O python-snap7.tar.gz https://github.com/RevolutionPi/python-snap7/archive/master.tar.gz
-wget -O snap7-debian.tar.gz https://github.com/RevolutionPi/snap7-debian/archive/master.tar.gz
-wget -O python3-revpimodio2.tar.gz https://github.com/naruxde/revpimodio2/archive/master.tar.gz
 
 # clean up
 rm -r $APTROOT
